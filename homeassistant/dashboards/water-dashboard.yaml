@@ -1,0 +1,60 @@
+title: 🌱 Greenhouse Water Monitor
+views:
+  - title: Overview
+    path: water-overview
+    icon: mdi:water
+    cards:
+      # ── Current flow ──────────────────────────────────────────────────────
+      - type: gauge
+        name: Flow Rate
+        entity: sensor.greenhouse_water_monitor_water_flow_rate
+        min: 0
+        max: 30
+        unit: L/min
+        severity:
+          green: 0
+          yellow: 20
+          red: 25
+
+      # ── Flow active indicator ─────────────────────────────────────────────
+      - type: entity
+        name: Water Flowing
+        entity: binary_sensor.greenhouse_water_monitor_water_flowing
+        icon: mdi:waves
+
+      # ── Volume stats ──────────────────────────────────────────────────────
+      - type: entities
+        title: Volume
+        entities:
+          - entity: sensor.greenhouse_water_monitor_daily_water_usage
+            name: Today
+            icon: mdi:calendar-today
+          - entity: sensor.greenhouse_water_monitor_total_water_volume
+            name: Total (all time)
+            icon: mdi:water
+          - type: button
+            name: Reset Total
+            action_name: Reset
+            tap_action:
+              action: call-service
+              service: button.press
+              target:
+                entity_id: button.greenhouse_water_monitor_reset_total_volume
+
+      # ── 24h flow history ──────────────────────────────────────────────────
+      - type: history-graph
+        title: Flow Rate – Last 24h
+        hours_to_show: 24
+        entities:
+          - entity: sensor.greenhouse_water_monitor_water_flow_rate
+            name: L/min
+
+      # ── 7-day daily usage bar chart ───────────────────────────────────────
+      - type: statistics-graph
+        title: Daily Usage – Last 7 Days
+        entities:
+          - entity: sensor.greenhouse_water_monitor_daily_water_usage
+        days_to_show: 7
+        chart_type: bar
+        stat_types:
+          - max

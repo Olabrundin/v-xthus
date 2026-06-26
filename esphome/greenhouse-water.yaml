@@ -1,0 +1,111 @@
+esphome:
+  name: greenhouse-water
+  friendly_name: Greenhouse Water Monitor
+  comment: "YF-S201 flow sensor via TXS0108E on ESP32-C6, Thread connected"
+
+esp32:
+  variant: esp32c6
+  board: esp32-c6-devkitc-1
+  framework:
+    type: esp-idf
+    version: recommended
+
+# ── Thread / OpenThread ────────────────────────────────────────────────────────
+thread:
+  device_type: end_device
+
+# ── Home Assistant API (encrypted) ────────────────────────────────────────────
+api:
+  encryption:
+    key: !secret api_encryption_key
+
+# ── OTA Updates ───────────────────────────────────────────────────────────────
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# ── Logging (reduce in production) ───────────────────────────────────────────
+logger:
+  level: INFO
+
+# ── Globals (persistent total volume across reboots) ─────────────────────────
+globals:
+  - id: total_liters
+    type: float
+    restore_value: true
+    initial_value: "0.0"
+
+# ── Sensors ───────────────────────────────────────────────────────────────────
+sensor:
+  # Flow rate in L/min
+  - platform: pulse_counter
+    id: flow_pulse_counter
+    pin:
+      number: GPIO4
+      mode:
+        input: true
+        pullup: false   # TXS0108E handles signal level; no pull-up needed
+    name: "Water Flow Rate"
+    unit_of_measurement: "L/min"
+    icon: mdi:water-pump
+    accuracy_decimals: 2
+    update_interval: 10s
+    filters:
+      # YF-S201 spec: ~450 pulses/liter
+      # pulse_counter returns pulses/min → divide by 450 to get L/min
+      - multiply: 0.002222   # = 1/450
+    on_value:
+      then:
+        - lambda: |-
+            // Accumulate total: flow (L/min) * interval (10s / 60) = liters added
+            id(total_liters) += x * (10.0 / 60.0);
+            id(total_volume_sensor).publish_state(id(total_liters));
+
+  # Total accumulated volume (L)
+  - platform: template
+    id: total_volume_sensor
+    name: "Total Water Volume"
+    unit_of_measurement: "L"
+    icon: mdi:water
+    accuracy_decimals: 2
+    lambda: |-
+      return id(total_liters);
+    update_interval: 10s
+
+  # Daily usage – resets at midnight via HA automation
+  - platform: template
+    id: daily_volume_sensor
+    name: "Daily Water Usage"
+    unit_of_measurement: "L"
+    icon: mdi:calendar-today
+    accuracy_decimals: 2
+    lambda: |-
+      return id(total_liters);  # Reset handled externally via HA
+    update_interval: 60s
+
+# ── Binary Sensors ────────────────────────────────────────────────────────────
+binary_sensor:
+  # Flow active indicator
+  - platform: template
+    name: "Water Flowing"
+    icon: mdi:waves
+    lambda: |-
+      return id(flow_pulse_counter).state > 0.05;
+
+# ── Buttons ───────────────────────────────────────────────────────────────────
+button:
+  # Reset total volume counter from HA
+  - platform: template
+    name: "Reset Total Volume"
+    icon: mdi:restart
+    on_press:
+      then:
+        - lambda: |-
+            id(total_liters) = 0.0;
+            id(total_volume_sensor).publish_state(0.0);
+
+# ── Status LED (optional, GPIO8 = built-in on many C6 boards) ────────────────
+light:
+  - platform: status_led
+    name: "Status LED"
+    pin: GPIO8

@@ -1,0 +1,73 @@
+# ── Greenhouse Water Monitor – Automations ────────────────────────────────────
+# Paste each automation into HA via Settings → Automations → Import YAML
+# or add to your configuration.yaml under `automation:`.
+
+# 1. Reset daily usage counter every midnight
+- id: greenhouse_reset_daily_water
+  alias: "Greenhouse – Reset Daily Water Usage"
+  description: "Resets the daily water counter at midnight"
+  trigger:
+    - platform: time
+      at: "00:00:00"
+  action:
+    - service: button.press
+      target:
+        entity_id: button.greenhouse_water_monitor_reset_total_volume
+  mode: single
+
+# 2. Alert if water flows for too long (possible leak)
+- id: greenhouse_water_leak_alert
+  alias: "Greenhouse – Possible Water Leak Alert"
+  description: "Notifies if water flows continuously for more than 30 minutes"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.greenhouse_water_monitor_water_flowing
+      to: "on"
+      for:
+        minutes: 30
+  action:
+    - service: notify.notify
+      data:
+        title: "⚠️ Greenhouse Water Alert"
+        message: "Water has been flowing for over 30 minutes. Possible leak?"
+  mode: single
+
+# 3. Alert if daily usage exceeds threshold
+- id: greenhouse_high_daily_usage
+  alias: "Greenhouse – High Daily Water Usage"
+  description: "Notifies if daily water usage exceeds 500 L"
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.greenhouse_water_monitor_daily_water_usage
+      above: 500
+  action:
+    - service: notify.notify
+      data:
+        title: "💧 High Water Usage"
+        message: >
+          Greenhouse has used {{ states('sensor.greenhouse_water_monitor_daily_water_usage') }} L today.
+  mode: single
+
+# 4. Notify when water stops (irrigation cycle complete)
+- id: greenhouse_irrigation_done
+  alias: "Greenhouse – Irrigation Cycle Complete"
+  description: "Notifies when water stops flowing after being active"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.greenhouse_water_monitor_water_flowing
+      from: "on"
+      to: "off"
+      for:
+        seconds: 30
+  condition:
+    - condition: time
+      after: "06:00:00"
+      before: "22:00:00"
+  action:
+    - service: notify.notify
+      data:
+        title: "🌱 Irrigation Complete"
+        message: >
+          Watering finished. Total today: 
+          {{ states('sensor.greenhouse_water_monitor_daily_water_usage') }} L.
+  mode: single

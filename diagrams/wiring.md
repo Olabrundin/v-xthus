@@ -1,0 +1,56 @@
+# Wiring Diagram
+
+## Overview
+
+```
+┌─────────────┐        ┌──────────────────┐        ┌─────────────────┐
+│   YF-S201   │        │    TXS0108E      │        │  ESP32-C6 Mini  │
+│  Flow Sensor│        │  Level Converter │        │                 │
+│             │        │                  │        │                 │
+│ VCC (red)───┼──5V───►│VB                │        │                 │
+│             │        │                  │        │                 │
+│ GND (blk)───┼────────┼──GND─────────────┼────────┼─GND             │
+│             │        │                  │        │                 │
+│ SIG (yel)───┼────────┼►B1          A1──►┼────────┼─GPIO4           │
+│             │        │                  │        │                 │
+└─────────────┘        │  VA◄─────────────┼────────┼─3.3V            │
+                       │  OE◄─────────────┼────────┼─3.3V            │
+                       │  VB◄─────────────┼──5V    │                 │
+                       │                  │        │                 │
+                       └──────────────────┘        └─────────────────┘
+```
+
+## Power Supply
+
+```
+External 5V ──────┬──► YF-S201 VCC (red)
+                  └──► TXS0108E VB
+
+ESP32-C6 3.3V ────┬──► TXS0108E VA
+                  └──► TXS0108E OE
+
+Common GND ───────┬──► YF-S201 GND (black)
+                  ├──► TXS0108E GND
+                  └──► ESP32-C6 GND
+```
+
+## TXS0108E Pin Reference
+
+```
+   B-side (5V)          A-side (3.3V)
+   ──────────           ─────────────
+   VB  ← 5V            VA  ← 3.3V
+   B1  ← YF-S201 sig   A1  → GPIO4
+   B2  (unused)         A2  (unused)
+   ...                  ...
+   OE  ← 3.3V (enable)
+   GND ← common ground
+```
+
+## Notes
+
+- **OE (Output Enable)** MUST be tied to 3.3V, otherwise the chip is disabled
+- **VA** sets the logic level for the A-side (ESP32 = 3.3V)
+- **VB** sets the logic level for the B-side (sensor = 5V)
+- Only channels B1/A1 are used; remaining channels can be left unconnected
+- No external pull-up resistor needed on GPIO4 (TXS0108E is push-pull compatible with YF-S201)
